@@ -45,8 +45,13 @@ pygame.mixer.music.play(-1)  # -1 = 무한 반복
 # 배타적 전체화면(pygame.FULLSCREEN)은 알트탭 등으로 포커스를 잃으면 디스플레이 서피스가
 # 깨지면서 다음 draw 호출에서 게임이 죽는 경우가 있어(대결 중 갑자기 꺼지는 원인),
 # 테두리 없는 창 모드(NOFRAME)로 모니터 크기를 채우도록 한다.
-_desktop_w, _desktop_h = pygame.display.get_desktop_sizes()[0]
-window = pygame.display.set_mode((_desktop_w, _desktop_h), pygame.NOFRAME)
+# 웹(pygbag/emscripten) 빌드에서는 브라우저가 캔버스 크기를 담당하므로 이 로직을 건너뛴다.
+_IS_WEB = sys.platform == "emscripten"
+if _IS_WEB:
+    window = pygame.display.set_mode((WIDTH, HEIGHT))
+else:
+    _desktop_w, _desktop_h = pygame.display.get_desktop_sizes()[0]
+    window = pygame.display.set_mode((_desktop_w, _desktop_h), pygame.NOFRAME)
 screen = pygame.Surface((WIDTH, HEIGHT))
 pygame.display.set_caption("Geo Dash (Python)")
 clock = pygame.time.Clock()
@@ -67,8 +72,11 @@ def present():
         # 포커스 변경 등으로 디스플레이 서피스가 일시적으로 깨졌을 때
         # 게임이 그대로 죽지 않도록 창을 다시 만들어 복구를 시도한다.
         try:
-            dw, dh = pygame.display.get_desktop_sizes()[0]
-            window = pygame.display.set_mode((dw, dh), pygame.NOFRAME)
+            if _IS_WEB:
+                window = pygame.display.set_mode((WIDTH, HEIGHT))
+            else:
+                dw, dh = pygame.display.get_desktop_sizes()[0]
+                window = pygame.display.set_mode((dw, dh), pygame.NOFRAME)
         except pygame.error:
             pass
 

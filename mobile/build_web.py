@@ -18,7 +18,7 @@ OVERLAY_FILE = Path(__file__).resolve().parent / "touch_overlay.html"
 
 def run_pygbag_build():
     subprocess.run(
-        [sys.executable, "-m", "pygbag", "--build", "main.py"],
+        [sys.executable, "-m", "pygbag", "--disable-sound-format-error", "--build", "main.py"],
         cwd=ROOT,
         check=True,
     )
