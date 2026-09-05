@@ -4702,10 +4702,12 @@ class SansBoss:
 
     def _do_slams(self, player, ptype):
         d = self.data
-        pull = 14.0 if ptype == "slam_gravity" else 19.0
-        pull_dur = 22 if ptype == "slam_gravity" else 13
+        # 미는 게 아니라 던지는 느낌이 나도록: 시간 제한 대신 실제로 벽에
+        # 닿을 때까지 강하게 던지고, 닿은 지 0.5초(30프레임) 뒤에 뼈가 솟는다.
+        pull = 28.0 if ptype == "slam_gravity" else 38.0
         spike_lf = 30 if ptype == "slam_gravity" else 20
         wait_t = 22 if ptype == "slam_gravity" else 13
+        WALL_DELAY = 30
 
         for sp in d["spikes"]:
             sp["life"] -= 1
@@ -4721,19 +4723,19 @@ class SansBoss:
 
         if d["slam_phase"] == "waiting":
             d["slam_dir"] = random.choice(["left", "right", "up", "down"])
-            d["slam_timer"] = pull_dur
-            d["slam_phase"] = "pulling"
-        elif d["slam_phase"] == "pulling":
+            d["slam_phase"] = "throwing"
+        elif d["slam_phase"] == "throwing":
             sd = d["slam_dir"]
             if sd == "left":   player.knockback_vx = -pull
             elif sd == "right": player.knockback_vx = pull
             elif sd == "up":    player.knockback_vy = -pull
             elif sd == "down":  player.knockback_vy = pull
-            d["slam_timer"] -= 1
-            if d["slam_timer"] <= 0:
-                d["slam_phase"] = "spike_delay"
-                d["slam_timer"] = 48  # 0.8초 대기
-        elif d["slam_phase"] == "spike_delay":
+            hit_wall = ((sd == "left" and player.x <= 60) or (sd == "right" and player.x >= WIDTH - 60) or
+                        (sd == "up" and player.y <= 60) or (sd == "down" and player.y >= HEIGHT - 60))
+            if hit_wall:
+                d["slam_phase"] = "wall_delay"
+                d["slam_timer"] = WALL_DELAY
+        elif d["slam_phase"] == "wall_delay":
             d["slam_timer"] -= 1
             if d["slam_timer"] <= 0:
                 d["spikes"].append({"wall": d["slam_dir"], "life": spike_lf})
@@ -4888,16 +4890,17 @@ class SansBoss:
             if d["slams_done"] < 8:
                 if d["slam_phase"] == "waiting":
                     d["slam_dir"] = random.choice(["left", "right", "up", "down"])
-                    d["slam_timer"] = 11; d["slam_phase"] = "pulling"
-                elif d["slam_phase"] == "pulling":
+                    d["slam_phase"] = "throwing"
+                elif d["slam_phase"] == "throwing":
                     sd2 = d["slam_dir"]
-                    if sd2 == "left":   player.knockback_vx = -21.0
-                    elif sd2 == "right": player.knockback_vx = 21.0
-                    elif sd2 == "up":    player.knockback_vy = -21.0
-                    elif sd2 == "down":  player.knockback_vy = 21.0
-                    d["slam_timer"] -= 1
-                    if d["slam_timer"] <= 0:
-                        d["slam_phase"] = "spike_delay2"; d["slam_timer"] = 48
+                    if sd2 == "left":   player.knockback_vx = -42.0
+                    elif sd2 == "right": player.knockback_vx = 42.0
+                    elif sd2 == "up":    player.knockback_vy = -42.0
+                    elif sd2 == "down":  player.knockback_vy = 42.0
+                    hit_wall2 = ((sd2 == "left" and player.x <= 60) or (sd2 == "right" and player.x >= WIDTH - 60) or
+                                 (sd2 == "up" and player.y <= 60) or (sd2 == "down" and player.y >= HEIGHT - 60))
+                    if hit_wall2:
+                        d["slam_phase"] = "spike_delay2"; d["slam_timer"] = 30
                 elif d["slam_phase"] == "spike_delay2":
                     d["slam_timer"] -= 1
                     if d["slam_timer"] <= 0:
