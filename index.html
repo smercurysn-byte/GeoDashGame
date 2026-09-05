@@ -434,5 +434,115 @@ frameborder="1"
 
     </script>
 
+<style>
+#touch-controls {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    display: none;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+#touch-controls.active { display: block; }
+
+#touch-controls .tc-btn {
+    position: absolute;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.18);
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-radius: 50%;
+    color: #fff;
+    font: bold 14px/1 sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+#touch-controls .tc-btn.tc-active {
+    background: rgba(255, 255, 255, 0.45);
+}
+
+/* D-pad, bottom-left */
+#tc-up    { left: 70px;  bottom: 168px; width: 56px; height: 56px; }
+#tc-down  { left: 70px;  bottom: 40px;  width: 56px; height: 56px; }
+#tc-left  { left: 12px;  bottom: 104px; width: 56px; height: 56px; }
+#tc-right { left: 128px; bottom: 104px; width: 56px; height: 56px; }
+
+/* Action buttons, bottom-right */
+#tc-space { right: 24px; bottom: 60px; width: 84px; height: 84px; font-size: 15px; }
+#tc-heal  { right: 130px; bottom: 40px; width: 56px; height: 56px; }
+
+/* Escape, top-right */
+#tc-esc   { right: 16px; top: 16px; width: 44px; height: 44px; font-size: 11px; }
+</style>
+
+<div id="touch-controls">
+    <div class="tc-btn" id="tc-up"    data-code="ArrowUp"    data-key="ArrowUp">▲</div>
+    <div class="tc-btn" id="tc-down"  data-code="ArrowDown"  data-key="ArrowDown">▼</div>
+    <div class="tc-btn" id="tc-left"  data-code="ArrowLeft"  data-key="ArrowLeft">◀</div>
+    <div class="tc-btn" id="tc-right" data-code="ArrowRight" data-key="ArrowRight">▶</div>
+    <div class="tc-btn" id="tc-space" data-code="Space"      data-key=" ">JUMP</div>
+    <div class="tc-btn" id="tc-heal"  data-code="KeyE"       data-key="e">E</div>
+    <div class="tc-btn" id="tc-esc"   data-code="Escape"     data-key="Escape">ESC</div>
+</div>
+
+<script>
+(function () {
+    var isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    var panel = document.getElementById('touch-controls');
+    if (!isTouch || !panel) return;
+    panel.classList.add('active');
+
+    var keyCodeMap = {
+        ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39,
+        Space: 32, KeyE: 69, Escape: 27
+    };
+
+    function fire(type, code, key) {
+        var ev = new KeyboardEvent(type, {
+            code: code,
+            key: key,
+            keyCode: keyCodeMap[code],
+            which: keyCodeMap[code],
+            bubbles: true,
+            cancelable: true
+        });
+        document.dispatchEvent(ev);
+        window.dispatchEvent(ev);
+    }
+
+    var buttons = panel.querySelectorAll('.tc-btn');
+    buttons.forEach(function (btn) {
+        var code = btn.getAttribute('data-code');
+        var key = btn.getAttribute('data-key');
+        var activeTouchId = null;
+
+        btn.addEventListener('touchstart', function (e) {
+            e.preventDefault();
+            if (activeTouchId !== null) return;
+            var t = e.changedTouches[0];
+            activeTouchId = t.identifier;
+            btn.classList.add('tc-active');
+            fire('keydown', code, key);
+        }, { passive: false });
+
+        function release(e) {
+            for (var i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === activeTouchId) {
+                    activeTouchId = null;
+                    btn.classList.remove('tc-active');
+                    fire('keyup', code, key);
+                    break;
+                }
+            }
+        }
+        btn.addEventListener('touchend', release, { passive: false });
+        btn.addEventListener('touchcancel', release, { passive: false });
+    });
+})();
+</script>
+
 </body>
 </html>
