@@ -28,28 +28,46 @@
     background: rgba(255, 255, 255, 0.45);
 }
 
-/* D-pad, bottom-left */
-#tc-up    { left: 70px;  bottom: 168px; width: 56px; height: 56px; }
-#tc-down  { left: 70px;  bottom: 40px;  width: 56px; height: 56px; }
-#tc-left  { left: 12px;  bottom: 104px; width: 56px; height: 56px; }
-#tc-right { left: 128px; bottom: 104px; width: 56px; height: 56px; }
+/* 이동 조이스틱, 좌측 하단 */
+#tc-joy-base {
+    position: absolute;
+    left: 24px;
+    bottom: 24px;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    pointer-events: auto;
+    touch-action: none;
+}
+#tc-joy-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 56px;
+    height: 56px;
+    margin-left: -28px;
+    margin-top: -28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.55);
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    pointer-events: none;
+}
 
-/* Action buttons, bottom-right */
-#tc-space { right: 24px; bottom: 60px; width: 84px; height: 84px; font-size: 15px; }
-#tc-heal  { right: 130px; bottom: 40px; width: 56px; height: 56px; }
+/* 대시 버튼, 우측 하단 */
+#tc-dash  { right: 26px; bottom: 34px; width: 96px; height: 96px; font-size: 16px; }
+#tc-heal  { right: 132px; bottom: 46px; width: 54px; height: 54px; }
 
-/* Escape, top-right */
+/* 나가기, 우측 상단 */
 #tc-esc   { right: 16px; top: 16px; width: 44px; height: 44px; font-size: 11px; }
 </style>
 
 <div id="touch-controls">
-    <div class="tc-btn" id="tc-up"    data-code="ArrowUp"    data-key="ArrowUp">▲</div>
-    <div class="tc-btn" id="tc-down"  data-code="ArrowDown"  data-key="ArrowDown">▼</div>
-    <div class="tc-btn" id="tc-left"  data-code="ArrowLeft"  data-key="ArrowLeft">◀</div>
-    <div class="tc-btn" id="tc-right" data-code="ArrowRight" data-key="ArrowRight">▶</div>
-    <div class="tc-btn" id="tc-space" data-code="Space"      data-key=" ">JUMP</div>
-    <div class="tc-btn" id="tc-heal"  data-code="KeyE"       data-key="e">E</div>
-    <div class="tc-btn" id="tc-esc"   data-code="Escape"     data-key="Escape">ESC</div>
+    <div id="tc-joy-base"><div id="tc-joy-knob"></div></div>
+    <div class="tc-btn" id="tc-dash" data-code="Space" data-key=" ">DASH</div>
+    <div class="tc-btn" id="tc-heal" data-code="KeyE"  data-key="e">E</div>
+    <div class="tc-btn" id="tc-esc"  data-code="Escape" data-key="Escape">ESC</div>
 </div>
 
 <script>
@@ -77,6 +95,7 @@
         window.dispatchEvent(ev);
     }
 
+    // ── 버튼(대시/힐/나가기) ──
     var buttons = panel.querySelectorAll('.tc-btn');
     buttons.forEach(function (btn) {
         var code = btn.getAttribute('data-code');
@@ -105,5 +124,96 @@
         btn.addEventListener('touchend', release, { passive: false });
         btn.addEventListener('touchcancel', release, { passive: false });
     });
+
+    // ── 이동 조이스틱 (8방향, 방향키를 눌렀다 떼는 것으로 흉내) ──
+    var joyBase = document.getElementById('tc-joy-base');
+    var joyKnob = document.getElementById('tc-joy-knob');
+    var joyTouchId = null;
+    var joyActiveDirs = [];   // 현재 눌려 있는 것으로 취급되는 방향키들
+    var JOY_RADIUS = 65;      // base 반지름(px)
+    var JOY_DEADZONE = 0.25;  // 이 비율 미만 기울이면 방향 없음
+
+    function dirsForAngle(deg) {
+        // 0deg = 오른쪽, 시계방향(화면 좌표계 기준)
+        if (deg > -22.5 && deg <= 22.5)   return ['ArrowRight'];
+        if (deg > 22.5 && deg <= 67.5)    return ['ArrowRight', 'ArrowDown'];
+        if (deg > 67.5 && deg <= 112.5)   return ['ArrowDown'];
+        if (deg > 112.5 && deg <= 157.5)  return ['ArrowDown', 'ArrowLeft'];
+        if (deg > 157.5 || deg <= -157.5) return ['ArrowLeft'];
+        if (deg > -157.5 && deg <= -112.5) return ['ArrowLeft', 'ArrowUp'];
+        if (deg > -112.5 && deg <= -67.5)  return ['ArrowUp'];
+        return ['ArrowUp', 'ArrowRight'];
+    }
+
+    function setJoyDirs(newDirs) {
+        joyActiveDirs.forEach(function (d) {
+            if (newDirs.indexOf(d) === -1) fire('keyup', d, d);
+        });
+        newDirs.forEach(function (d) {
+            if (joyActiveDirs.indexOf(d) === -1) fire('keydown', d, d);
+        });
+        joyActiveDirs = newDirs;
+    }
+
+    function updateJoy(clientX, clientY) {
+        var rect = joyBase.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2;
+        var cy = rect.top + rect.height / 2;
+        var dx = clientX - cx;
+        var dy = clientY - cy;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var clamped = Math.min(dist, JOY_RADIUS);
+        var angle = Math.atan2(dy, dx);
+        var kx = Math.cos(angle) * clamped;
+        var ky = Math.sin(angle) * clamped;
+        joyKnob.style.left = (65 + kx) + 'px';
+        joyKnob.style.top = (65 + ky) + 'px';
+        joyKnob.style.marginLeft = '-28px';
+        joyKnob.style.marginTop = '-28px';
+
+        if (dist / JOY_RADIUS < JOY_DEADZONE) {
+            setJoyDirs([]);
+        } else {
+            setJoyDirs(dirsForAngle(angle * 180 / Math.PI));
+        }
+    }
+
+    function resetJoy() {
+        joyKnob.style.left = '50%';
+        joyKnob.style.top = '50%';
+        joyKnob.style.marginLeft = '-28px';
+        joyKnob.style.marginTop = '-28px';
+        setJoyDirs([]);
+    }
+
+    joyBase.addEventListener('touchstart', function (e) {
+        e.preventDefault();
+        if (joyTouchId !== null) return;
+        var t = e.changedTouches[0];
+        joyTouchId = t.identifier;
+        updateJoy(t.clientX, t.clientY);
+    }, { passive: false });
+
+    joyBase.addEventListener('touchmove', function (e) {
+        e.preventDefault();
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === joyTouchId) {
+                updateJoy(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                break;
+            }
+        }
+    }, { passive: false });
+
+    function joyRelease(e) {
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === joyTouchId) {
+                joyTouchId = null;
+                resetJoy();
+                break;
+            }
+        }
+    }
+    joyBase.addEventListener('touchend', joyRelease, { passive: false });
+    joyBase.addEventListener('touchcancel', joyRelease, { passive: false });
 })();
 </script>
