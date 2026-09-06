@@ -17,8 +17,17 @@ OVERLAY_FILE = Path(__file__).resolve().parent / "touch_overlay.html"
 
 
 def run_pygbag_build():
+    # --ume_block=0 : 기본값(1)이면 오디오 잠금 해제용 사용자 조작을 기다리다가
+    #   게임이 시작되지 않고 회색/흰 화면에서 멈춘다. 0으로 두면 바로 실행된다.
+    # --disable-sound-format-error : mp3 에셋 때문에 빌드가 실패하는 것을 막는다.
+    #   (브라우저에서 mp3 재생이 안 되더라도 main.py가 오디오 실패를 무시한다.)
     subprocess.run(
-        [sys.executable, "-m", "pygbag", "--disable-sound-format-error", "--build", "main.py"],
+        [
+            sys.executable, "-m", "pygbag",
+            "--disable-sound-format-error",
+            "--ume_block=0",
+            "--build", "main.py",
+        ],
         cwd=ROOT,
         check=True,
     )

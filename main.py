@@ -36,9 +36,44 @@ _MAX_CODE_LEN = max(len(BOSS_CODE), len(BOSS_SELECT_CODE))
 BOSS_SELECT_LIST = ["드래곤", "기사", "마왕", "거울속의 나", "샌즈", "파피루스", "언다인", "토리엘", "아스리엘"]
 
 pygame.init()
-pygame.mixer.init()
-pygame.mixer.music.load("assets/geodash_music.mp3")
-pygame.mixer.music.play(-1)  # -1 = 무한 반복
+
+# 오디오는 브라우저(WASM) 빌드에서 mp3 디코더가 없어 실패할 수 있다.
+# 소리가 안 나는 건 괜찮지만 그것 때문에 게임이 통째로 죽으면 안 되므로
+# 모든 오디오 호출을 안전하게 감싼다.
+try:
+    pygame.mixer.init()
+    _AUDIO_OK = True
+except pygame.error:
+    _AUDIO_OK = False
+
+
+def play_music(path, loops=-1):
+    """배경음 재생. 실패해도 게임은 계속 진행된다."""
+    if not _AUDIO_OK:
+        return
+    try:
+        pygame.mixer.music.load(path)
+        pygame.mixer.music.play(loops)
+    except pygame.error:
+        pass
+
+
+def load_sound(path):
+    """효과음 로드. 실패하면 재생해도 아무 일 없는 더미를 돌려준다."""
+    if _AUDIO_OK:
+        try:
+            return pygame.mixer.Sound(path)
+        except pygame.error:
+            pass
+
+    class _SilentSound:
+        def play(self, *a, **kw):
+            return None
+
+    return _SilentSound()
+
+
+play_music("assets/geodash_music.mp3")
 
 # 실제 창은 모니터 화면 크기에 맞추고, 게임은 내부적으로 800x400 캔버스에 그린 뒤
 # 화면 크기에 맞게 확대해서 보여준다 (좌표 기반 게임 로직은 그대로 유지).
@@ -101,16 +136,25 @@ def poll_events():
 
 
 font = pygame.font.SysFont(None, 48)
-try:
-    korean_font = pygame.font.Font("C:/Windows/Fonts/malgun.ttf", 34)
-except Exception:
-    korean_font = pygame.font.SysFont("malgungothic", 34)
 
+
+def load_korean_font(size):
+    """한글 지원 폰트를 불러온다.
+
+    assets/korean.ttf(게임에 쓰이는 글자만 남긴 서브셋)를 먼저 쓴다.
+    웹(WASM) 빌드에는 윈도우 시스템 폰트가 없어서 이 번들 폰트가 필수다.
+    """
+    for path in ("assets/korean.ttf", "C:/Windows/Fonts/malgun.ttf"):
+        try:
+            return pygame.font.Font(path, size)
+        except Exception:
+            continue
+    return pygame.font.SysFont("malgungothic", size)
+
+
+korean_font = load_korean_font(34)
 # 화면(400px) 안에 여러 줄을 담아야 하는 조작 안내/보스 선택 목록용 축소 폰트.
-try:
-    korean_font_sm = pygame.font.Font("C:/Windows/Fonts/malgun.ttf", 22)
-except Exception:
-    korean_font_sm = pygame.font.SysFont("malgungothic", 22)
+korean_font_sm = load_korean_font(22)
 
 DRAGON_IMAGE = pygame.image.load("assets/dragon.png").convert_alpha()
 KNIGHT_IMAGE = pygame.image.load("assets/knight.png").convert_alpha()
@@ -127,15 +171,15 @@ ASRIEL_IMAGE          = pygame.image.load("assets/asriel.png").convert_alpha()
 ASRIEL_RETURNED_IMAGE = pygame.image.load("assets/asriel_returned.png").convert_alpha()
 
 SWORD_SOUNDS = [
-    pygame.mixer.Sound("assets/sword_clash.mp3"),
-    pygame.mixer.Sound("assets/armor_impact.mp3"),
+    load_sound("assets/sword_clash.mp3"),
+    load_sound("assets/armor_impact.mp3"),
 ]
 
 DRAGON_SOUNDS = [
-    pygame.mixer.Sound("assets/dragon_breath1.mp3"),
-    pygame.mixer.Sound("assets/dragon_breath2.mp3"),
-    pygame.mixer.Sound("assets/dragon_sigh.mp3"),
-    pygame.mixer.Sound("assets/dragon_roar.mp3"),
+    load_sound("assets/dragon_breath1.mp3"),
+    load_sound("assets/dragon_breath2.mp3"),
+    load_sound("assets/dragon_sigh.mp3"),
+    load_sound("assets/dragon_roar.mp3"),
 ]
 
 
@@ -6098,8 +6142,7 @@ def fight_orange_mirror(player, small_font):
 
 def run_boss_fight():
     """치트코드로 진입하는 보스전. 보스를 순서대로 모두 처치하면 'win'을 반환."""
-    pygame.mixer.music.load("assets/boss_music.mp3")
-    pygame.mixer.music.play(-1)
+    play_music("assets/boss_music.mp3", -1)
 
     player = BossPlayer()
     small_font = pygame.font.SysFont(None, 28)
@@ -6126,15 +6169,13 @@ def run_boss_fight():
         player.hp = 23
         result = fight_orange_mirror(player, small_font)
 
-    pygame.mixer.music.load("assets/geodash_music.mp3")
-    pygame.mixer.music.play(-1)
+    play_music("assets/geodash_music.mp3", -1)
     return result
 
 
 def fight_papyrus(player, small_font):
     try:
-        pygame.mixer.music.load("assets/boss_music.mp3")
-        pygame.mixer.music.play(-1)
+        play_music("assets/boss_music.mp3", -1)
     except Exception:
         pass
 
@@ -6415,8 +6456,7 @@ def fight_papyrus(player, small_font):
 
 def fight_undyne(player, small_font):
     try:
-        pygame.mixer.music.load("assets/boss_music.mp3")
-        pygame.mixer.music.play(-1)
+        play_music("assets/boss_music.mp3", -1)
     except Exception:
         pass
 
@@ -6641,8 +6681,7 @@ def fight_undyne(player, small_font):
 
 def fight_sans(player, small_font):
     try:
-        pygame.mixer.music.load("assets/sans_music.mp3")
-        pygame.mixer.music.play(-1)
+        play_music("assets/sans_music.mp3", -1)
     except Exception:
         pass
 
@@ -7206,8 +7245,7 @@ def fight_sans(player, small_font):
 
 def fight_toriel(player, small_font):
     try:
-        pygame.mixer.music.load("assets/boss_music.mp3")
-        pygame.mixer.music.play(-1)
+        play_music("assets/boss_music.mp3", -1)
     except Exception:
         pass
 
@@ -7418,8 +7456,7 @@ def fight_toriel(player, small_font):
 
 def fight_asriel(player, small_font):
     try:
-        pygame.mixer.music.load("assets/boss_music.mp3")
-        pygame.mixer.music.play(-1)
+        play_music("assets/boss_music.mp3", -1)
     except Exception:
         pass
 
@@ -7718,8 +7755,7 @@ def run_single_boss(boss_cls):
     if boss_cls == "SansBoss":
         result = fight_sans(player, small_font)
         try:
-            pygame.mixer.music.load("assets/geodash_music.mp3")
-            pygame.mixer.music.play(-1)
+            play_music("assets/geodash_music.mp3", -1)
         except Exception:
             pass
         return result
@@ -7728,8 +7764,7 @@ def run_single_boss(boss_cls):
         player.hp = 23
         result = fight_orange_mirror(player, small_font)
         try:
-            pygame.mixer.music.load("assets/geodash_music.mp3")
-            pygame.mixer.music.play(-1)
+            play_music("assets/geodash_music.mp3", -1)
         except Exception:
             pass
         return result
@@ -7737,8 +7772,7 @@ def run_single_boss(boss_cls):
     if boss_cls == "PapyrusBoss":
         result = fight_papyrus(player, small_font)
         try:
-            pygame.mixer.music.load("assets/geodash_music.mp3")
-            pygame.mixer.music.play(-1)
+            play_music("assets/geodash_music.mp3", -1)
         except Exception:
             pass
         return result
@@ -7746,8 +7780,7 @@ def run_single_boss(boss_cls):
     if boss_cls == "UndyneBoss":
         result = fight_undyne(player, small_font)
         try:
-            pygame.mixer.music.load("assets/geodash_music.mp3")
-            pygame.mixer.music.play(-1)
+            play_music("assets/geodash_music.mp3", -1)
         except Exception:
             pass
         return result
@@ -7755,8 +7788,7 @@ def run_single_boss(boss_cls):
     if boss_cls == "TorielBoss":
         result = fight_toriel(player, small_font)
         try:
-            pygame.mixer.music.load("assets/geodash_music.mp3")
-            pygame.mixer.music.play(-1)
+            play_music("assets/geodash_music.mp3", -1)
         except Exception:
             pass
         return result
@@ -7764,18 +7796,15 @@ def run_single_boss(boss_cls):
     if boss_cls == "AsrielBoss":
         result = fight_asriel(player, small_font)
         try:
-            pygame.mixer.music.load("assets/geodash_music.mp3")
-            pygame.mixer.music.play(-1)
+            play_music("assets/geodash_music.mp3", -1)
         except Exception:
             pass
         return result
 
-    pygame.mixer.music.load("assets/boss_music.mp3")
-    pygame.mixer.music.play(-1)
+    play_music("assets/boss_music.mp3", -1)
     boss = boss_cls()
     result = fight_one_boss(player, boss, small_font)
-    pygame.mixer.music.load("assets/geodash_music.mp3")
-    pygame.mixer.music.play(-1)
+    play_music("assets/geodash_music.mp3", -1)
     return result
 
 
